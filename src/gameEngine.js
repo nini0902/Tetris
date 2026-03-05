@@ -137,12 +137,20 @@ function lockPieceToBoard(board, piece) {
 }
 
 function clearLines(board) {
+  const clearedRows = [];
+  board.forEach((row, index) => {
+    if (row.every((cell) => cell !== 0)) {
+      clearedRows.push(index);
+    }
+  });
+
   const remainingRows = board.filter((row) => row.some((cell) => cell === 0));
   const clearedCount = BOARD_HEIGHT - remainingRows.length;
   const newRows = Array.from({ length: clearedCount }, () => new Array(BOARD_WIDTH).fill(0));
   return {
     board: [...newRows, ...remainingRows],
     clearedCount,
+    clearedRows,
   };
 }
 
@@ -153,7 +161,7 @@ function lineClearScore(clearedCount, level) {
 
 function advanceAfterLock(state, hardDropBonus = 0, randomFn = Math.random) {
   const lockedBoard = lockPieceToBoard(state.board, state.currentPiece);
-  const { board: boardAfterClear, clearedCount } = clearLines(lockedBoard);
+  const { board: boardAfterClear, clearedCount, clearedRows } = clearLines(lockedBoard);
 
   const totalLines = state.lines + clearedCount;
   const level = Math.floor(totalLines / 10) + 1;
@@ -165,6 +173,7 @@ function advanceAfterLock(state, hardDropBonus = 0, randomFn = Math.random) {
     score: state.score + scoreGain,
     lines: totalLines,
     level,
+    lastClearedRows: clearedRows,
   };
 
   return spawnNextPiece(baseState, randomFn);
@@ -180,6 +189,7 @@ export function createGameState(options = {}) {
     lines: 0,
     level: 1,
     gameOver: false,
+    lastClearedRows: [],
   };
 
   return spawnNextPiece(state, options.randomFn);

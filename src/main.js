@@ -2,7 +2,6 @@ import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
   createGameState,
-  hardDrop,
   levelToDropInterval,
   mergeBoardWithPiece,
   movePiece,
@@ -34,10 +33,13 @@ const boardCtx = boardCanvas.getContext('2d');
 const nextCtx = nextCanvas.getContext('2d');
 const SWIPE_THRESHOLD = 24;
 const HORIZONTAL_BIAS = 1.25;
+const CLEAR_EFFECT_DURATION = 520;
 
 let state = createGameState();
 let previous = performance.now();
 let dropAccumulator = 0;
+let clearEffects = [];
+let isPaused = false;
 let touchStartX = 0;
 let touchStartY = 0;
 let touchCurrentX = 0;
@@ -101,6 +103,72 @@ function drawBoard() {
   }
 }
 
+function drawLineClearEffects(delta) {
+  if (clearEffects.length === 0) {
+    return;
+  }
+
+  for (let i = clearEffects.length - 1; i >= 0; i -= 1) {
+    const effect = clearEffects[i];
+    effect.elapsed += delta;
+
+    const progress = Math.min(effect.elapsed / CLEAR_EFFECT_DURATION, 1);
+    const fade = 1 - progress;
+    const flashPhase = Math.min(progress / 0.22, 1);
+    const sweepPhase = Math.max((progress - 0.12) / 0.88, 0);
+    const y = effect.row * CELL_SIZE;
+    const sweepWidth = boardCanvas.width * sweepPhase;
+    const beamWidth = 180;
+
+    // Wide row glow to ensure line clear is obvious even on small mobile screens.
+    boardCtx.fillStyle = `rgba(123, 234, 255, ${0.78 * fade})`;
+    boardCtx.fillRect(0, y, boardCanvas.width, CELL_SIZE);
+
+    // Initial white flash pulse.
+    if (flashPhase < 1) {
+      boardCtx.fillStyle = `rgba(255, 255, 255, ${0.95 * (1 - flashPhase)})`;
+      boardCtx.fillRect(0, y, boardCanvas.width, CELL_SIZE);
+    }
+
+    const scan = boardCtx.createLinearGradient(
+      Math.max(0, sweepWidth - beamWidth),
+      y,
+      Math.min(boardCanvas.width, sweepWidth + beamWidth),
+      y,
+    );
+    scan.addColorStop(0, 'rgba(255,255,255,0)');
+    scan.addColorStop(0.25, `rgba(77, 245, 255, ${0.45 * fade})`);
+    scan.addColorStop(0.5, `rgba(255,255,255,${1.15 * fade})`);
+    scan.addColorStop(0.75, `rgba(77, 245, 255, ${0.45 * fade})`);
+    scan.addColorStop(1, 'rgba(255,255,255,0)');
+
+    boardCtx.save();
+    boardCtx.globalCompositeOperation = 'lighter';
+    boardCtx.fillStyle = scan;
+    boardCtx.fillRect(Math.max(0, sweepWidth - beamWidth), y, beamWidth * 2, CELL_SIZE);
+
+    // Energy trail behind the scanning beam.
+    boardCtx.fillStyle = `rgba(86, 237, 255, ${0.26 * fade})`;
+    boardCtx.fillRect(0, y + 3, Math.max(0, sweepWidth - 18), CELL_SIZE - 6);
+    boardCtx.restore();
+
+    if (progress >= 1) {
+      clearEffects.splice(i, 1);
+    }
+  }
+}
+
+function setState(nextState) {
+  if (nextState.lines > state.lines) {
+    const rows = nextState.lastClearedRows?.length ? nextState.lastClearedRows : [BOARD_HEIGHT - 1];
+    rows.forEach((row) => {
+      clearEffects.push({ row, elapsed: 0 });
+    });
+  }
+
+  state = nextState;
+}
+
 function drawNextPiece() {
   nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
   const matrix = PREVIEW_PIECES[state.nextPieceType] ?? [[0]];
@@ -122,6 +190,12 @@ function renderHud() {
   linesEl.textContent = String(state.lines);
   levelEl.textContent = String(state.level);
 
+  if (isPaused && !state.gameOver) {
+    messageEl.textContent = 'PAUSED - Press Space to resume';
+    messageEl.classList.add('visible');
+    return;
+  }
+
   if (state.gameOver) {
     messageEl.textContent = 'SYSTEM FAILURE - Press R to reboot';
     messageEl.classList.add('visible');
@@ -131,8 +205,9 @@ function renderHud() {
   }
 }
 
-function render() {
+function render(delta) {
   drawBoard();
+  drawLineClearEffects(delta);
   drawNextPiece();
   renderHud();
 }
@@ -141,37 +216,43 @@ function update(timestamp) {
   const delta = timestamp - previous;
   previous = timestamp;
 
-  if (!state.gameOver) {
+  if (!state.gameOver && !isPaused) {
     dropAccumulator += delta;
     const interval = levelToDropInterval(state.level);
     if (dropAccumulator >= interval) {
-      state = tick(state);
+      setState(tick(state));
       dropAccumulator = 0;
     }
   }
 
-  render();
+  render(delta);
   requestAnimationFrame(update);
 }
 
 window.addEventListener('keydown', (event) => {
-  if (event.key === 'r' || event.key === 'R') {
-    state = createGameState();
-    return;
-  }
-
-  if (state.gameOver) {
-    return;
-  }
-
-  if (event.key === 'ArrowLeft') state = movePiece(state, -1, 0);
-  if (event.key === 'ArrowRight') state = movePiece(state, 1, 0);
-  if (event.key === 'ArrowDown') state = tick(state);
-  if (event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W') state = rotatePiece(state);
   if (event.code === 'Space') {
     event.preventDefault();
-    state = hardDrop(state);
+    if (!state.gameOver) {
+      isPaused = !isPaused;
+    }
+    return;
   }
+
+  if (event.key === 'r' || event.key === 'R') {
+    clearEffects = [];
+    isPaused = false;
+    setState(createGameState());
+    return;
+  }
+
+  if (state.gameOver || isPaused) {
+    return;
+  }
+
+  if (event.key === 'ArrowLeft') setState(movePiece(state, -1, 0));
+  if (event.key === 'ArrowRight') setState(movePiece(state, 1, 0));
+  if (event.key === 'ArrowDown') setState(tick(state));
+  if (event.key === 'ArrowUp' || event.key === 'w' || event.key === 'W') setState(rotatePiece(state));
 });
 
 boardCanvas.addEventListener(
@@ -236,7 +317,7 @@ boardCanvas.addEventListener(
       const direction = deltaX > 0 ? 1 : -1;
       const steps = Math.max(1, Math.floor(absX / SWIPE_THRESHOLD));
       for (let i = 0; i < steps; i += 1) {
-        state = movePiece(state, direction, 0);
+        setState(movePiece(state, direction, 0));
       }
     }
 
@@ -253,5 +334,5 @@ boardCanvas.addEventListener(
   { passive: true },
 );
 
-render();
+render(0);
 requestAnimationFrame(update);
