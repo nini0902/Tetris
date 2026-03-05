@@ -1,6 +1,10 @@
 :root {
   --bg-1: #08111f;
   --bg-2: #04070d;
+  --bg-accent-left: #0f2f4d;
+  --bg-accent-right: #14205f;
+  --glow-left-color: #17bfff;
+  --glow-right-color: #2e73ff;
   --panel: rgba(7, 18, 34, 0.78);
   --panel-border: rgba(90, 228, 255, 0.38);
   --text: #d6ebff;
@@ -16,8 +20,8 @@ body {
   min-height: 100vh;
   font-family: 'Chakra Petch', sans-serif;
   color: var(--text);
-  background: radial-gradient(circle at 18% 20%, #0f2f4d 0%, transparent 48%),
-    radial-gradient(circle at 82% 80%, #14205f 0%, transparent 50%),
+  background: radial-gradient(circle at 18% 20%, var(--bg-accent-left) 0%, transparent 48%),
+    radial-gradient(circle at 82% 80%, var(--bg-accent-right) 0%, transparent 50%),
     linear-gradient(155deg, var(--bg-1) 0%, var(--bg-2) 65%);
   display: grid;
   place-items: center;
@@ -37,13 +41,13 @@ body {
 .bg-glow-left {
   left: -80px;
   top: -70px;
-  background: #17bfff;
+  background: var(--glow-left-color);
 }
 
 .bg-glow-right {
   right: -90px;
   bottom: -80px;
-  background: #2e73ff;
+  background: var(--glow-right-color);
 }
 
 .layout {
