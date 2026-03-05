@@ -92,6 +92,8 @@ h1 {
   box-shadow: 0 0 28px rgba(61, 206, 255, 0.3);
   background: rgba(4, 8, 16, 0.95);
   animation: boardEnter 460ms ease;
+  touch-action: none;
+  user-select: none;
 }
 
 .message {
