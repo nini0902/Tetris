@@ -32,10 +32,17 @@ const messageEl = document.querySelector('#message');
 
 const boardCtx = boardCanvas.getContext('2d');
 const nextCtx = nextCanvas.getContext('2d');
+const SWIPE_THRESHOLD = 24;
+const HORIZONTAL_BIAS = 1.25;
 
 let state = createGameState();
 let previous = performance.now();
 let dropAccumulator = 0;
+let touchStartX = 0;
+let touchStartY = 0;
+let touchCurrentX = 0;
+let touchCurrentY = 0;
+let touchTracking = false;
 
 const PREVIEW_PIECES = {
   I: [[1, 1, 1, 1]],
@@ -166,6 +173,85 @@ window.addEventListener('keydown', (event) => {
     state = hardDrop(state);
   }
 });
+
+boardCanvas.addEventListener(
+  'touchstart',
+  (event) => {
+    const [touch] = event.touches;
+    if (!touch) return;
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    touchCurrentX = touch.clientX;
+    touchCurrentY = touch.clientY;
+    touchTracking = true;
+  },
+  { passive: true },
+);
+
+boardCanvas.addEventListener(
+  'touchmove',
+  (event) => {
+    if (!touchTracking || state.gameOver) {
+      return;
+    }
+
+    const [touch] = event.touches;
+    if (!touch) return;
+
+    touchCurrentX = touch.clientX;
+    touchCurrentY = touch.clientY;
+
+    const deltaX = touchCurrentX - touchStartX;
+    const deltaY = touchCurrentY - touchStartY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    if (absX > absY * HORIZONTAL_BIAS) {
+      event.preventDefault();
+    }
+  },
+  { passive: false },
+);
+
+boardCanvas.addEventListener(
+  'touchend',
+  (event) => {
+    if (!touchTracking || state.gameOver) {
+      touchTracking = false;
+      return;
+    }
+
+    const endTouch = event.changedTouches?.[0];
+    if (endTouch) {
+      touchCurrentX = endTouch.clientX;
+      touchCurrentY = endTouch.clientY;
+    }
+
+    const deltaX = touchCurrentX - touchStartX;
+    const deltaY = touchCurrentY - touchStartY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    if (absX >= SWIPE_THRESHOLD && absX > absY * HORIZONTAL_BIAS) {
+      const direction = deltaX > 0 ? 1 : -1;
+      const steps = Math.max(1, Math.floor(absX / SWIPE_THRESHOLD));
+      for (let i = 0; i < steps; i += 1) {
+        state = movePiece(state, direction, 0);
+      }
+    }
+
+    touchTracking = false;
+  },
+  { passive: true },
+);
+
+boardCanvas.addEventListener(
+  'touchcancel',
+  () => {
+    touchTracking = false;
+  },
+  { passive: true },
+);
 
 render();
 requestAnimationFrame(update);
