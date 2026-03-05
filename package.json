@@ -1,0 +1,29 @@
+{
+  "name": "tetris",
+  "version": "1.0.0",
+  "description": "A neon-tech Tetris game built with TDD and deployed to GitHub Pages",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nini0902/Tetris.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/nini0902/Tetris/issues"
+  },
+  "homepage": "https://github.com/nini0902/Tetris#readme",
+  "devDependencies": {
+    "jsdom": "^28.1.0",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
+  }
+}
